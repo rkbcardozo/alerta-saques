@@ -14,7 +14,9 @@ const TZ = env('TIMEZONE', 'America/Bogota');                    // fuso dos jog
 const REPEAT_MINUTES = Number(env('REPEAT_MINUTES', '60'));      // repete o alerta a cada X min enquanto continuar sem saque
 const STATE_FILE = 'state/state.json';
 
-webpush.setVapidDetails(env('VAPID_SUBJECT', 'mailto:admin@example.com'), env('VAPID_PUBLIC_KEY'), env('VAPID_PRIVATE_KEY'));
+// Chave pública vem do docs/config.js (mesma que o site usa), assim não precisa duplicar
+const PUBLIC_KEY = (fs.readFileSync('docs/config.js', 'utf8').match(/VAPID_PUBLIC_KEY\s*=\s*'([^']+)'/) || [])[1] || env('VAPID_PUBLIC_KEY');
+webpush.setVapidDetails(env('VAPID_SUBJECT', 'mailto:admin@example.com'), PUBLIC_KEY, env('VAPID_PRIVATE_KEY'));
 let subs = JSON.parse(env('PUSH_SUBSCRIPTIONS', '[]'));
 if (!Array.isArray(subs)) subs = [subs];
 
