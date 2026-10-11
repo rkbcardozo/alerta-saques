@@ -1,6 +1,7 @@
 // Avisa no celular quando fica muito tempo sem NENHUM pedido de saque novo
 // (sinal de que o saque pode ter quebrado). Roda no GitHub Actions a cada ~5 min.
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import webpush from 'web-push';
 
 const env = (k, d) => (process.env[k] ?? '').trim() || d;
@@ -32,6 +33,25 @@ async function push(payload) {
   }
 }
 
+// Gera o código de 6 dígitos do 2FA, o mesmo que o app Authenticator mostra
+function totp(secretB32) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const c of secretB32.replace(/[\s=-]/g, '').toUpperCase()) bits += alphabet.indexOf(c).toString(2).padStart(5, '0');
+  const key = Buffer.from(bits.match(/.{8}/g).map(b => parseInt(b, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const h = crypto.createHmac('sha1', key).update(counter).digest();
+  const o = h[h.length - 1] & 0xf;
+  return String((h.readUInt32BE(o) & 0x7fffffff) % 1e6).padStart(6, '0');
+}
+
+const cookiesDe = res => res.headers.getSetCookie().map(c => c.split(';')[0]);
+const resumoErro = async res => {
+  try { const j = await res.json(); return JSON.stringify({ code: j.code, message: j.message, errors: j.errors }); }
+  catch { return `(HTTP ${res.status})`; }
+};
+
 async function getCookie() {
   if (env('BO_COOKIE')) return env('BO_COOKIE');
   const res = await fetch(BASE + LOGIN_PATH, {
@@ -39,10 +59,40 @@ async function getCookie() {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ identifier: env('BO_EMAIL'), password: env('BO_PASSWORD') }),
   });
-  if (!res.ok) throw new Error(`Login falhou (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
-  const cookies = res.headers.getSetCookie().map(c => c.split(';')[0]);
-  if (!cookies.length) throw new Error('Login não retornou cookie de sessão');
-  return cookies.join('; ');
+  if (res.ok) {
+    const c = cookiesDe(res);
+    if (c.length) return c.join('; ');
+    throw new Error('Login não retornou cookie de sessão');
+  }
+  const body = await res.json().catch(() => ({}));
+  if (body.code !== 'TWO_FACTOR_REQUIRED')
+    throw new Error(`Login falhou: ${JSON.stringify({ code: body.code, message: body.message, errors: body.errors })}`);
+  if (!env('BO_TOTP_SECRET')) throw new Error('Backoffice pediu 2FA e falta o secret BO_TOTP_SECRET');
+
+  // 2ª etapa: envia o código do 2FA junto com o token do desafio
+  const challengeToken = body.context?.challengeToken;
+  const code = totp(env('BO_TOTP_SECRET'));
+  const paths = env('BO_2FA_PATH') ? [env('BO_2FA_PATH')] : [
+    '/api/auth/admin/2fa/verify', '/api/auth/admin/login/2fa', '/api/auth/admin/two-factor/verify',
+    '/api/auth/admin/login/verify', '/api/auth/admin/verify-2fa', '/api/auth/admin/2fa',
+    '/api/auth/admin/totp/verify', '/api/auth/admin/mfa/verify', '/api/auth/admin/login/two-factor',
+  ];
+  for (const path of paths) {
+    const r = await fetch(BASE + path, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ challengeToken, code }),
+    });
+    if (r.status === 404) { console.log(`2FA: ${path} -> 404`); continue; }
+    if (r.ok) {
+      const c = cookiesDe(r);
+      console.log(`2FA OK em ${path}${env('BO_2FA_PATH') ? '' : ' (crie a variável BO_2FA_PATH com esse valor)'}`);
+      if (c.length) return c.join('; ');
+      throw new Error(`2FA aceito em ${path} mas sem cookie de sessão`);
+    }
+    throw new Error(`2FA falhou em ${path}: ${await resumoErro(r)}`);
+  }
+  throw new Error('Não encontrei o endereço de verificação do 2FA');
 }
 
 // Último pedido de saque de jogador real (qualquer status), ignorando usuários de teste
