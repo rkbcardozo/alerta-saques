@@ -1,0 +1,7 @@
+{
+  "name": "saques-alerta",
+  "private": true,
+  "type": "module",
+  "scripts": { "check": "node check.mjs" },
+  "dependencies": { "web-push": "^3.6.7" }
+}
