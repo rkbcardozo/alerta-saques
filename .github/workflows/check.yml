@@ -34,6 +34,8 @@ jobs:
           BO_PASSWORD: ${{ secrets.BO_PASSWORD }}
           BO_COOKIE: ${{ secrets.BO_COOKIE }}
           BO_LOGIN_PATH: ${{ vars.BO_LOGIN_PATH }}
+          BO_TOTP_SECRET: ${{ secrets.BO_TOTP_SECRET }}
+          BO_2FA_PATH: ${{ vars.BO_2FA_PATH }}
           VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
