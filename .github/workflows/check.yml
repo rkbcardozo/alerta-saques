@@ -1,0 +1,53 @@
+name: Checar saques
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # a cada 5 min (o GitHub pode atrasar um pouco)
+  workflow_dispatch:         # botão "Run workflow" para testar na hora
+
+concurrency:
+  group: checar-saques
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+
+      - name: Restaurar estado anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: state
+          key: saques-state-${{ github.run_id }}
+          restore-keys: saques-state-
+
+      - name: Checar saques e enviar notificações
+        run: node check.mjs
+        env:
+          BO_EMAIL: ${{ secrets.BO_EMAIL }}
+          BO_PASSWORD: ${{ secrets.BO_PASSWORD }}
+          BO_COOKIE: ${{ secrets.BO_COOKIE }}
+          BO_LOGIN_PATH: ${{ vars.BO_LOGIN_PATH }}
+          VAPID_PUBLIC_KEY: ${{ secrets.VAPID_PUBLIC_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_SUBJECT: ${{ vars.VAPID_SUBJECT }}
+          PUSH_SUBSCRIPTIONS: ${{ secrets.PUSH_SUBSCRIPTIONS }}
+          NO_WITHDRAW_HOURS: ${{ vars.NO_WITHDRAW_HOURS }}
+          NIGHT_HOURS: ${{ vars.NIGHT_HOURS }}
+          NIGHT_START: ${{ vars.NIGHT_START }}
+          NIGHT_END: ${{ vars.NIGHT_END }}
+          TIMEZONE: ${{ vars.TIMEZONE }}
+          REPEAT_MINUTES: ${{ vars.REPEAT_MINUTES }}
+
+      - name: Salvar estado
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state
+          key: saques-state-${{ github.run_id }}
