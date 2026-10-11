@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Alerta de Saques</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#7c3aed">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Saques">
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#0f0f14; color:#eee;
+         display:flex; justify-content:center; padding:24px 16px; }
+  main { max-width:480px; width:100%; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  p { color:#aaa; line-height:1.5; font-size:15px; }
+  button { width:100%; padding:14px; border:0; border-radius:10px; font-size:16px; font-weight:600;
+           background:#7c3aed; color:#fff; margin-top:12px; cursor:pointer; }
+  button.secondary { background:#26262f; }
+  textarea { width:100%; box-sizing:border-box; height:150px; margin-top:12px; background:#1a1a22; color:#ddd;
+             border:1px solid #333; border-radius:8px; padding:10px; font-family:monospace; font-size:12px; }
+  .status { margin-top:16px; padding:12px; border-radius:8px; background:#1a1a22; font-size:14px; }
+  .ok { color:#4ade80; } .err { color:#f87171; }
+  ol { color:#aaa; padding-left:20px; line-height:1.6; font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🔔 Alerta de Saques</h1>
+  <p>Ativa as notificações de saques do backoffice neste aparelho.</p>
+
+  <div id="ios-hint" class="status" hidden>
+    No iPhone: toque em <b>Compartilhar → Adicionar à Tela de Início</b> e abra o app pelo ícone. Só depois disso as notificações funcionam.
+  </div>
+
+  <button id="enable">Ativar notificações</button>
+  <div id="status" class="status" hidden></div>
+
+  <div id="sub-box" hidden>
+    <ol>
+      <li>Copie o código abaixo.</li>
+      <li>No GitHub, adicione ele ao secret <b>PUSH_SUBSCRIPTIONS</b> (veja o README).</li>
+    </ol>
+    <textarea id="sub" readonly></textarea>
+    <button id="copy" class="secondary">Copiar código</button>
+  </div>
+</main>
+<script src="config.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if (isIOS && !standalone) $('ios-hint').hidden = false;
+
+function show(msg, cls) { const s = $('status'); s.hidden = false; s.className = 'status ' + (cls||''); s.innerHTML = msg; }
+
+function b64ToUint8(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function enable() {
+  try {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window))
+      return show('Este navegador não suporta notificações push. No iPhone, adicione à Tela de Início primeiro.', 'err');
+    if (!window.VAPID_PUBLIC_KEY || window.VAPID_PUBLIC_KEY.startsWith('COLE'))
+      return show('Falta configurar a VAPID_PUBLIC_KEY no arquivo config.js.', 'err');
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return show('Permissão negada. Libere as notificações nas configurações do navegador.', 'err');
+    const reg = await navigator.serviceWorker.register('sw.js');
+    await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToUint8(window.VAPID_PUBLIC_KEY) });
+    $('sub').value = JSON.stringify(sub);
+    $('sub-box').hidden = false;
+    show('✅ Notificações ativadas neste aparelho. Agora copie o código abaixo para o GitHub.', 'ok');
+    reg.showNotification('Alerta de Saques', { body: 'Notificações ativadas!', icon: 'icon-192.png' });
+  } catch (e) { show('Erro: ' + e.message, 'err'); }
+}
+$('enable').onclick = enable;
+$('copy').onclick = async () => { await navigator.clipboard.writeText($('sub').value); $('copy').textContent = 'Copiado ✓'; };
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+</script>
+</body>
+</html>
