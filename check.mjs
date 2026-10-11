@@ -37,7 +37,7 @@ async function getCookie() {
   const res = await fetch(BASE + LOGIN_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: env('BO_EMAIL'), password: env('BO_PASSWORD') }),
+    body: JSON.stringify({ identifier: env('BO_EMAIL'), password: env('BO_PASSWORD') }),
   });
   if (!res.ok) throw new Error(`Login falhou (HTTP ${res.status}): ${(await res.text()).slice(0, 300)}`);
   const cookies = res.headers.getSetCookie().map(c => c.split(';')[0]);
