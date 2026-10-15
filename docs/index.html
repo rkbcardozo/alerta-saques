@@ -6,22 +6,23 @@
 <title>Alerta de Saques</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
-<meta name="theme-color" content="#7c3aed">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Saques">
 <style>
   :root { color-scheme: dark; }
-  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#0f0f14; color:#eee;
+  body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#000; color:#eee;
          display:flex; justify-content:center; padding:24px 16px; }
   main { max-width:480px; width:100%; }
   h1 { font-size:22px; margin:0 0 6px; }
   p { color:#aaa; line-height:1.5; font-size:15px; }
   button { width:100%; padding:14px; border:0; border-radius:10px; font-size:16px; font-weight:600;
-           background:#7c3aed; color:#fff; margin-top:12px; cursor:pointer; }
-  button.secondary { background:#26262f; }
-  textarea { width:100%; box-sizing:border-box; height:150px; margin-top:12px; background:#1a1a22; color:#ddd;
+           background:#fff; color:#000; margin-top:12px; cursor:pointer; }
+  button.secondary { background:#1c1c1c; color:#fff; border:1px solid #333; }
+  textarea { width:100%; box-sizing:border-box; height:150px; margin-top:12px; background:#111; color:#ddd;
              border:1px solid #333; border-radius:8px; padding:10px; font-family:monospace; font-size:12px; }
-  .status { margin-top:16px; padding:12px; border-radius:8px; background:#1a1a22; font-size:14px; }
+  .status { margin-top:16px; padding:12px; border-radius:8px; background:#111; font-size:14px; }
   .ok { color:#4ade80; } .err { color:#f87171; }
   ol { color:#aaa; padding-left:20px; line-height:1.6; font-size:14px; }
 </style>
