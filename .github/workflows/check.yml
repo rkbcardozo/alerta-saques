@@ -46,6 +46,7 @@ jobs:
           NIGHT_END: ${{ vars.NIGHT_END }}
           TIMEZONE: ${{ vars.TIMEZONE }}
           REPEAT_MINUTES: ${{ vars.REPEAT_MINUTES }}
+          NOTIFY_EACH_WITHDRAWAL: ${{ vars.NOTIFY_EACH_WITHDRAWAL }}
 
       - name: Salvar estado
         if: always()
