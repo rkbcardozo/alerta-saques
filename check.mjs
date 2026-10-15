@@ -144,6 +144,16 @@ try {
       }
     }
   }
+  // Teste manual: Actions → Checar saques → Run workflow → marcar "Enviar notificação de teste"
+  if (env('TEST_PUSH') === 'true') {
+    const quem = last?.user?.username || last?.user?.name || last?.user?.email || '';
+    await push({
+      title: `🧪 TESTE · 💸 Saque: ${valorSaque(last) || 'novo pedido'}`,
+      body: [quem, last && horaLocal(last.createdAt)].filter(Boolean).join(' • ') || 'Notificação de teste',
+      tag: 'teste',
+    });
+  }
+
   next.seenIds = [...new Set([...saques.map(idDe), ...(next.seenIds || [])])].slice(0, 300);
 
   if (state.lastErrorAlert) await push({ title: '✅ Monitor de saques voltou', body: 'O acesso ao backoffice voltou a funcionar.', tag: 'erro' });
