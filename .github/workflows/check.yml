@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'   # a cada 5 min (o GitHub pode atrasar um pouco)
   workflow_dispatch:         # botão "Run workflow" para testar na hora
+    inputs:
+      teste:
+        description: 'Enviar notificação de teste (com o último saque)'
+        type: boolean
+        default: false
 
 concurrency:
   group: checar-saques
@@ -47,6 +52,7 @@ jobs:
           TIMEZONE: ${{ vars.TIMEZONE }}
           REPEAT_MINUTES: ${{ vars.REPEAT_MINUTES }}
           NOTIFY_EACH_WITHDRAWAL: ${{ vars.NOTIFY_EACH_WITHDRAWAL }}
+          TEST_PUSH: ${{ inputs.teste }}
 
       - name: Salvar estado
         if: always()
