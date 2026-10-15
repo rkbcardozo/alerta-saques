@@ -135,10 +135,9 @@ try {
       await push({ title: `💸 ${novos.length} novos pedidos de saque`, body: lista || 'Confira no backoffice.', tag: 'novo-saque' });
     } else {
       for (const t of novos) {
-        const quem = t.user?.username || t.user?.name || t.user?.email || '';
         await push({
           title: `💸 Saque: ${valorSaque(t) || 'novo pedido'}`,
-          body: [quem, horaLocal(t.createdAt)].filter(Boolean).join(' • '),
+          body: horaLocal(t.createdAt),
           tag: 'saque-' + idDe(t),
         });
       }
@@ -146,10 +145,9 @@ try {
   }
   // Teste manual: Actions → Checar saques → Run workflow → marcar "Enviar notificação de teste"
   if (env('TEST_PUSH') === 'true') {
-    const quem = last?.user?.username || last?.user?.name || last?.user?.email || '';
     await push({
       title: `🧪 TESTE · 💸 Saque: ${valorSaque(last) || 'novo pedido'}`,
-      body: [quem, last && horaLocal(last.createdAt)].filter(Boolean).join(' • ') || 'Notificação de teste',
+      body: last ? horaLocal(last.createdAt) : 'Notificação de teste',
       tag: 'teste',
     });
   }

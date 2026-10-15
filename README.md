@@ -9,7 +9,7 @@ Manda notificação no celular quando passa muito tempo (padrão 3h) sem ningué
 
 | Alerta | Quando |
 |---|---|
-| 💸 Saque: valor moeda | Entrou um pedido de saque novo (mostra valor, moeda, jogador e hora). Se entrarem mais de 5 de uma vez, vem um resumo só. Desligue com a variável `NOTIFY_EACH_WITHDRAWAL` = `false` |
+| 💸 Saque: valor moeda | Entrou um pedido de saque novo (mostra valor, moeda e hora). Se entrarem mais de 5 de uma vez, vem um resumo só. Desligue com a variável `NOTIFY_EACH_WITHDRAWAL` = `false` |
 | ⚠️ Nenhum saque há Xh | Passaram `NO_WITHDRAW_HOURS` horas (padrão **3**) sem nenhum pedido de saque de jogador real, em qualquer status. Mostra valor e moeda do último saque |
 | ✅ Saques voltaram | Entrou um pedido novo depois de um alerta |
 | ❌ Monitor com erro | Login ou API do backoffice falharam |
