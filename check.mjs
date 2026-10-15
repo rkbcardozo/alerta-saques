@@ -13,6 +13,8 @@ const NIGHT_START = Number(env('NIGHT_START', '0'));             // madrugada co
 const NIGHT_END = Number(env('NIGHT_END', '7'));                 // madrugada termina (hora local)
 const TZ = env('TIMEZONE', 'America/Bogota');                    // fuso dos jogadores
 const REPEAT_MINUTES = Number(env('REPEAT_MINUTES', '60'));      // repete o alerta a cada X min enquanto continuar sem saque
+const NOTIFY_EACH = env('NOTIFY_EACH_WITHDRAWAL', 'true') !== 'false';  // push a cada novo pedido de saque
+const MAX_PUSH_PER_RUN = 5;                                      // acima disso manda um resumo só
 const STATE_FILE = 'state/state.json';
 
 // Chave pública vem do docs/config.js (mesma que o site usa), assim não precisa duplicar
@@ -23,7 +25,7 @@ if (!Array.isArray(subs)) subs = [subs];
 
 const now = Date.now();
 const state = fs.existsSync(STATE_FILE) ? JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) : {};
-const next = { lastGapAlert: state.lastGapAlert || 0, lastErrorAlert: state.lastErrorAlert || 0 };
+const next = { lastGapAlert: state.lastGapAlert || 0, lastErrorAlert: state.lastErrorAlert || 0, seenIds: state.seenIds || null };
 
 async function push(payload) {
   console.log('PUSH:', payload.title, '-', payload.body);
@@ -95,28 +97,62 @@ async function getCookie() {
   throw new Error('Não encontrei o endereço de verificação do 2FA');
 }
 
-// Último pedido de saque de jogador real (qualquer status), ignorando usuários de teste
-async function lastWithdrawal(cookie) {
+// Pedidos de saque recentes de jogadores reais (qualquer status), ignorando usuários de teste, do mais novo ao mais antigo
+async function recentWithdrawals(cookie) {
   const res = await fetch(`${BASE}/api/admin/transactions?type=WITHDRAW&page=1&limit=50`, { headers: { cookie, accept: 'application/json' } });
   if (!res.ok) throw new Error(`API de saques respondeu HTTP ${res.status}`);
   const { data = [] } = await res.json();
-  return data
-    .filter(t => !t.user?.isTestUser)
-    .reduce((a, t) => (!a || t.createdAt > a.createdAt ? t : a), null);
+  return data.filter(t => !t.user?.isTestUser).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 const hora = ms => Number(new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', hourCycle: 'h23' }).format(new Date(ms)));
 const madrugada = ms => { const h = hora(ms); return NIGHT_START < NIGHT_END ? h >= NIGHT_START && h < NIGHT_END : h >= NIGHT_START || h < NIGHT_END; };
 
+// Valor e moeda do saque. Os nomes dos campos variam, então tenta os mais comuns.
+const num = v => (v == null || v === '' ? null : Number(typeof v === 'object' ? v.amount ?? v.value : v));
+function valorSaque(t) {
+  if (!t) return '';
+  const valor = [t.amount, t.value, t.requestedAmount, t.grossAmount, t.amountRequested].map(num).find(v => v != null && !isNaN(v));
+  const moeda = t.currency?.code ?? t.currency?.symbol ?? t.currency ?? t.currencyCode ?? t.wallet?.currency?.code ?? t.wallet?.currency ?? t.amount?.currency ?? '';
+  if (valor == null) return '';
+  const n = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(valor);
+  return `${n} ${typeof moeda === 'string' ? moeda.toUpperCase() : ''}`.trim();
+}
+const horaLocal = iso => new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+
 const tempo = m => (m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m} min`);
 
 try {
-  const last = await lastWithdrawal(await getCookie());
+  const saques = await recentWithdrawals(await getCookie());
+  const last = saques[0] || null;
+  // Um push por pedido de saque novo (na 1ª execução só marca os atuais como vistos, para não disparar tudo de uma vez)
+  const idDe = t => String(t.id ?? t._id ?? `${t.createdAt}|${t.user?.id ?? ''}`);
+  if (NOTIFY_EACH && next.seenIds) {
+    const vistos = new Set(next.seenIds);
+    const novos = saques.filter(t => !vistos.has(idDe(t))).reverse();
+    if (novos.length > MAX_PUSH_PER_RUN) {
+      const lista = novos.map(valorSaque).filter(Boolean).slice(-10).join(', ');
+      await push({ title: `💸 ${novos.length} novos pedidos de saque`, body: lista || 'Confira no backoffice.', tag: 'novo-saque' });
+    } else {
+      for (const t of novos) {
+        const quem = t.user?.username || t.user?.name || t.user?.email || '';
+        await push({
+          title: `💸 Saque: ${valorSaque(t) || 'novo pedido'}`,
+          body: [quem, horaLocal(t.createdAt)].filter(Boolean).join(' • '),
+          tag: 'saque-' + idDe(t),
+        });
+      }
+    }
+  }
+  next.seenIds = [...new Set([...saques.map(idDe), ...(next.seenIds || [])])].slice(0, 300);
+
   if (state.lastErrorAlert) await push({ title: '✅ Monitor de saques voltou', body: 'O acesso ao backoffice voltou a funcionar.', tag: 'erro' });
   next.lastErrorAlert = 0;
 
   const minSemSaque = last ? Math.floor((now - new Date(last.createdAt).getTime()) / 60000) : Infinity;
-  console.log(`Último pedido de saque: ${last?.createdAt || 'nenhum'} (${tempo(minSemSaque)} atrás)`);
+  console.log(`Último pedido de saque: ${last?.createdAt || 'nenhum'} (${tempo(minSemSaque)} atrás) ${valorSaque(last)}`);
+  if (last && !valorSaque(last)) console.log('Não achei valor/moeda no saque. Campos disponíveis:', JSON.stringify(last));
+  const ultimo = last && valorSaque(last) ? ` Último: ${valorSaque(last)} em ${horaLocal(last.createdAt)}.` : '';
 
   // Usa o limite da madrugada se agora é madrugada ou se o último saque foi de madrugada
   const noturno = madrugada(now) || (last && madrugada(new Date(last.createdAt).getTime()));
@@ -127,13 +163,13 @@ try {
     if (now - next.lastGapAlert >= REPEAT_MINUTES * 60000) {
       await push({
         title: '⚠️ Nenhum saque há ' + tempo(minSemSaque),
-        body: `Ninguém pediu saque nas últimas ${tempo(minSemSaque)}. Confira se o saque está funcionando.`,
+        body: `Ninguém pediu saque nas últimas ${tempo(minSemSaque)}.${ultimo} Confira se o saque está funcionando.`,
         tag: 'sem-saque',
       });
       next.lastGapAlert = now;
     }
   } else if (next.lastGapAlert) {
-    await push({ title: '✅ Saques voltaram', body: 'Entrou um novo pedido de saque.', tag: 'sem-saque' });
+    await push({ title: '✅ Saques voltaram', body: last && valorSaque(last) ? `Novo pedido de saque: ${valorSaque(last)}.` : 'Entrou um novo pedido de saque.', tag: 'sem-saque' });
     next.lastGapAlert = 0;
   }
 } catch (e) {

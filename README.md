@@ -9,7 +9,8 @@ Manda notificação no celular quando passa muito tempo (padrão 3h) sem ningué
 
 | Alerta | Quando |
 |---|---|
-| ⚠️ Nenhum saque há Xh | Passaram `NO_WITHDRAW_HOURS` horas (padrão **3**) sem nenhum pedido de saque de jogador real, em qualquer status |
+| 💸 Saque: valor moeda | Entrou um pedido de saque novo (mostra valor, moeda, jogador e hora). Se entrarem mais de 5 de uma vez, vem um resumo só. Desligue com a variável `NOTIFY_EACH_WITHDRAWAL` = `false` |
+| ⚠️ Nenhum saque há Xh | Passaram `NO_WITHDRAW_HOURS` horas (padrão **3**) sem nenhum pedido de saque de jogador real, em qualquer status. Mostra valor e moeda do último saque |
 | ✅ Saques voltaram | Entrou um pedido novo depois de um alerta |
 | ❌ Monitor com erro | Login ou API do backoffice falharam |
 | ✅ Monitor voltou | O acesso ao backoffice voltou depois de um erro |
@@ -48,7 +49,7 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 | `VAPID_PRIVATE_KEY` | a Private Key do passo 2 |
 | `PUSH_SUBSCRIPTIONS` | preenchido no passo 5 |
 
-Na aba **Variables** (opcional): `NO_WITHDRAW_HOURS`, `NIGHT_HOURS`, `NIGHT_START`, `NIGHT_END`, `TIMEZONE`, `REPEAT_MINUTES`, `VAPID_SUBJECT` (ex.: `mailto:voce@email.com`) e `BO_LOGIN_PATH` (se o login do backoffice não for `/api/auth/admin/login`).
+Na aba **Variables** (opcional): `NO_WITHDRAW_HOURS`, `NIGHT_HOURS`, `NIGHT_START`, `NIGHT_END`, `TIMEZONE`, `REPEAT_MINUTES`, `NOTIFY_EACH_WITHDRAWAL`, `VAPID_SUBJECT` (ex.: `mailto:voce@email.com`) e `BO_LOGIN_PATH` (se o login do backoffice não for `/api/auth/admin/login`).
 
 ### 5. Ativar no celular
 1. Abra o site do passo 3 no celular.
